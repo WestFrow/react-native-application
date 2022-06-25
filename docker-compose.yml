@@ -1,0 +1,79 @@
+version: "3"
+networks:
+  proxy_default:
+    external: true
+  api:
+    container_name: container_api
+    entrypoint: ["java", "-javaagent:./dd-java-agent.jar", "-jar", "/back.jar"]
+    build:
+      context: ./back
+      dockerfile: Dockerfile
+      args:
+        # github user
+        USERNAME: ${USERNAME}
+        # github token
+        TOKEN: ${TOKEN}
+    image: "${IMAGE_NAME_BACK}:${IMAGE_TAG}"
+    restart: always
+    expose:
+      - 8081
+    volumes:
+      - ${MOUNT_POINT}/Data:/mnt/RENAA/Data
+      - ${MOUNT_POINT}/logs:/back/logs
+    environment:
+      # DB 接続先
+      - SPRING_DATASOURCE_URL
+      # DB ユーザー名
+      - SPRING_DATASOURCE_USERNAME
+      # DB パスワード
+      - SPRING_DATASOURCE_PASSWORD
+      # DB コンテキストパス
+      - SERVER_SERVLET_CONTEXTPATH=/api/rna
+      # KeyCloak 接続先
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUERURI=http://${OAUTH2_HOST_NAME}/auth/realms/renaa
+      # サーバー起動ポート
+      - SERVER_PORT=8081
+      # ログファイル
+      - LOGGING_FILE_NAME
+      # Datadog設定
+      - DD_AGENT_HOST=datadog-agent
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_ENV=pms
+      - DD_SERVICE=api
+      - DD_VERSION=1.0.0
+      - DD_LOGS_INJECTION=true
+      - DD_TRACE_SAMPLE_RATE=1
+    labels:
+      com.datadoghq.ad.logs: '[{"type": "docker", "subsys": "mgt", "source": "docker", "service": "api"}]'
+    networks:
+      - proxy_default
+  front:
+    container_name: container_front
+    env_file: .env
+    command: yarn start
+    ports:
+      - "19000:19000"
+      - "19001:19001"
+      - "19002:19002"
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+      args:
+        # バックエンドURL
+        REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL}
+        # フロントのコンテキスト
+        REACT_APP_BASE_URL: ${REACT_APP_BASE_URL}
+        # KEYCLOAKエンドポイント
+        REACT_APP_KEYCLOAK_URL: ${REACT_APP_KEYCLOAK_URL}
+        # トークン
+        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN}
+    image: "${IMAGE_NAME_FRONT}:${IMAGE_TAG}"
+    restart: always
+    volumes:
+      - ./front/nginx:/etc/nginx/conf.d/
+    expose:
+      - 80
+    labels:
+      com.datadoghq.ad.logs: '[{"type": "docker", "subsys": "master_mgt", "source": "docker", "service": "front"}]'
+    networks:
+      - c

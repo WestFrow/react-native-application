@@ -1,0 +1,8 @@
+{
+  "realm": "jagur",
+  "auth-server-url": "http://localhost:18080/auth/",
+  "ssl-required": "external",
+  "resource": "jagur",
+  "public-client": true,
+  "confidential-port": 0
+}
