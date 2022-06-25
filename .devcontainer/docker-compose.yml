@@ -1,0 +1,77 @@
+version: "3"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Update the VARIANT arg to pick a Java version: 11, 16
+        VARIANT: "11"
+        # Options
+        INSTALL_MAVEN: "false"
+        INSTALL_GRADLE: "true"
+        INSTALL_NODE: "true"
+        NODE_VERSION: "14"
+    ports:
+      - 8081:8081
+      - 3000:3000
+    volumes:
+      - ..:/jagur:cached
+
+    # Overrides default command so things don't shut down after the process ends.
+    command: sleep infinity
+
+    depends_on:
+      - db
+
+  db:
+    image: postgres:13-alpine
+    ports:
+      - 5432:5432
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d
+      - ./postgres/data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: jagur
+      POSTGRES_PASSWORD: jagur
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+      POSTGRES_DB: jagur
+    depends_on:
+      - keycloak
+
+  keycloak:
+    ports:
+      - "18080:8080"
+    environment:
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: password
+      DB_VENDOR: postgres
+      DB_ADDR: keycloak_db
+      DB_USER: keycloak
+      DB_PASSWORD: keycloak
+      JAVA_OPTS_APPEND: >
+        -Dkeycloak.migration.action=import
+        -Dkeycloak.migration.provider=dir
+        -Dkeycloak.migration.dir=/tmp/keycloak-data
+        -Dkeycloak.migration.strategy=IGNORE_EXISTING
+        -Dkeycloak.migration.usersExportStrategy=SAME_FILE
+        -Dkeycloak.migration.realmName=jagur
+    volumes:
+      - ./docker-keycloak/files/data:/tmp/keycloak-data:cached
+    image: jboss/keycloak:15.0.2
+    depends_on:
+      - keycloak_db
+
+  keycloak_db:
+    image: postgres:13-alpine
+    expose:
+      - "5432"
+    volumes:
+      - ./keycloak_db/init:/docker-entrypoint-initdb.d
+      - ./keycloak_db/data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+      POSTGRES_DB: keycloak
